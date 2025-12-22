@@ -3,7 +3,6 @@ import { auth, db } from "./firebase.js";
 
 import {
   GoogleAuthProvider,
-  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   onAuthStateChanged,
@@ -24,40 +23,37 @@ const userPhoto = document.getElementById("userPhoto");
 
 const provider = new GoogleAuthProvider();
 
-/* 🔘 Login button */
+/* 🔘 Register + Login (same button)
+   - Har click par signInWithRedirect
+   - Pehli baar aayega to "register" + auto-login
+   - Dusri baar se direct login
+*/
 loginBtn.onclick = async () => {
-  try {
-    // Desktop / most Android browsers
-    await signInWithPopup(auth, provider);
-  } catch (err) {
-    // Mobile fallback (Safari / some in‑app browsers)
-    await signInWithRedirect(auth, provider);
-  }
+  await signInWithRedirect(auth, provider);
 };
 
-/* 🔁 Handle redirect result (mobile) */
+/* 🔁 Redirect ke baad: yahan user milta hai (MOBILE + PC)
+   - Yahi pe Firestore me user create/update karna hai
+*/
 getRedirectResult(auth).then(async (result) => {
-  if (result?.user) {
-    await saveUserIfNew(result.user);
-  }
+  if (!result || !result.user) return;
+
+  const user = result.user;
+  await saveUserIfNew(user);        // register
+  updateUI(user);                   // auto login
 });
 
-/* 🔁 Auto login + UI update */
+/* 🔁 Page refresh / already logged in case */
 onAuthStateChanged(auth, async (user) => {
   if (user) {
-    await saveUserIfNew(user);
-
-    loginBtn.style.display = "none";
-    userBox.style.display  = "block";
-    userName.innerText     = user.displayName;
-    userPhoto.src          = user.photoURL;
+    await saveUserIfNew(user);      // agar doc nahi hai to bana de
+    updateUI(user);
   } else {
-    loginBtn.style.display = "block";
-    userBox.style.display  = "none";
+    showLoggedOut();
   }
 });
 
-/* 💾 Save user (sirf first time) */
+/* 💾 Register: agar doc nahi hai to naya user save karo */
 async function saveUserIfNew(user) {
   const ref  = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
@@ -72,6 +68,19 @@ async function saveUserIfNew(user) {
       createdAt: new Date()
     });
   }
+}
+
+/* 🧑 UI helpers */
+function updateUI(user) {
+  loginBtn.style.display = "none";
+  userBox.style.display  = "block";
+  userName.innerText     = user.displayName || user.email;
+  userPhoto.src          = user.photoURL || "";
+}
+
+function showLoggedOut() {
+  loginBtn.style.display = "block";
+  userBox.style.display  = "none";
 }
 
 /* 🚪 Logout */
