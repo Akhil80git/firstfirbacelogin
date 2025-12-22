@@ -7,6 +7,7 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebas
 const firebaseConfig = {
   apiKey: "AIzaSyDciz4ZaVuf11LA_MXb7a3YpmWbM6VyRC4",
   authDomain: "oplotp.firebaseapp.com",
+   authDomain: "oplotp.firebaseapp.com",
   projectId: "oplotp",
   storageBucket: "oplotp.firebasestorage.app",
   messagingSenderId: "995278859788",
