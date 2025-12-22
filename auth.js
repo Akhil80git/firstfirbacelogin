@@ -1,3 +1,4 @@
+// auth.js
 import { auth, db } from "./firebase.js";
 
 import {
@@ -15,48 +16,50 @@ import {
   getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const loginBtn = document.getElementById("loginBtn");
+const loginBtn  = document.getElementById("loginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
-const userBox = document.getElementById("userBox");
-const userName = document.getElementById("userName");
+const userBox   = document.getElementById("userBox");
+const userName  = document.getElementById("userName");
 const userPhoto = document.getElementById("userPhoto");
 
 const provider = new GoogleAuthProvider();
 
-// 🔘 Login button
+/* 🔘 Login button */
 loginBtn.onclick = async () => {
   try {
-    await signInWithPopup(auth, provider); // Desktop / Android
+    // Desktop / most Android browsers
+    await signInWithPopup(auth, provider);
   } catch (err) {
-    await signInWithRedirect(auth, provider); // iPhone fallback
+    // Mobile fallback (Safari / some in‑app browsers)
+    await signInWithRedirect(auth, provider);
   }
 };
 
-// 🔁 Handle redirect result (mobile)
+/* 🔁 Handle redirect result (mobile) */
 getRedirectResult(auth).then(async (result) => {
   if (result?.user) {
     await saveUserIfNew(result.user);
   }
 });
 
-// 🔁 Auto login (refresh ke baad)
+/* 🔁 Auto login + UI update */
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     await saveUserIfNew(user);
 
     loginBtn.style.display = "none";
-    userBox.style.display = "block";
-    userName.innerText = user.displayName;
-    userPhoto.src = user.photoURL;
+    userBox.style.display  = "block";
+    userName.innerText     = user.displayName;
+    userPhoto.src          = user.photoURL;
   } else {
     loginBtn.style.display = "block";
-    userBox.style.display = "none";
+    userBox.style.display  = "none";
   }
 });
 
-// 💾 Save user (sirf first time)
+/* 💾 Save user (sirf first time) */
 async function saveUserIfNew(user) {
-  const ref = doc(db, "users", user.uid);
+  const ref  = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
 
   if (!snap.exists()) {
@@ -71,7 +74,7 @@ async function saveUserIfNew(user) {
   }
 }
 
-// 🚪 Logout
+/* 🚪 Logout */
 logoutBtn.onclick = async () => {
   await signOut(auth);
 };
