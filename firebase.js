@@ -1,13 +1,17 @@
 // firebase.js
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithRedirect,
+  getRedirectResult,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// Firebase console -> Project settings -> Your apps -> Web app se liya hua config
 const firebaseConfig = {
   apiKey: "AIzaSyDciz4ZaVuf11LA_MXb7a3YpmWbM6VyRC4",
-  authDomain: "oplotp.firebaseapp.com",       // sirf ek baar
+  authDomain: "oplotp.firebaseapp.com",
   projectId: "oplotp",
   storageBucket: "oplotp.firebasestorage.app",
   messagingSenderId: "995278859788",
@@ -17,10 +21,25 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const provider = new GoogleAuthProvider();
 export const db = getFirestore(app);
+export const provider = new GoogleAuthProvider();
 
-// Example: sign in function (optional)
-export async function signInWithGoogle() {
-  await signInWithPopup(auth, provider);
+// button click pe yeh call karo (mobile + desktop dono ke liye safe)
+export function loginWithGoogle() {
+  signInWithRedirect(auth, provider);
 }
+
+// page load hone par (index.js ya main script me) yeh code zaroor chalao:
+getRedirectResult(auth).then(async (result) => {
+  if (!result) return;
+  const user = result.user;
+  if (!user) return;
+
+  // yahin Firestore me user save karo, taaki mobile par bhi hamesha chale
+  await setDoc(doc(db, "users", user.uid), {
+    uid: user.uid,
+    name: user.displayName,
+    email: user.email,
+    photoURL: user.photoURL
+  });
+});
