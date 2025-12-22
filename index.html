@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Google Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="box">
+    <h2>Welcome</h2>
+
+    <button id="loginBtn">Continue with Google</button>
+
+    <div id="userBox" style="display:none;">
+      <img id="userPhoto" />
+      <p id="userName"></p>
+      <button id="logoutBtn">Logout</button>
+    </div>
+  </div>
+
+  <script type="module" src="firebase.js"></script>
+  <script type="module" src="auth.js"></script>
+</body>
+</html>
