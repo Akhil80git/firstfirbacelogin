@@ -4,259 +4,171 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Firebase Google Login</title>
+
   <style>
-    * { box-sizing:border-box; }
+    * { box-sizing: border-box; }
     body {
-      margin:0;
+      margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:#f5f7fb;
-      min-height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
+      background: #f5f7fb;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .card {
-      background:#fff;
-      padding:24px;
-      border-radius:16px;
-      box-shadow:0 10px 30px rgba(0,0,0,.08);
-      width:100%;
-      max-width:380px;
-      text-align:center;
+      background: #fff;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.08);
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
     }
-    h1,h2,h3 { margin:0 0 10px; }
-    p { margin:0 0 6px; }
     button {
-      width:100%;
-      padding:14px;
-      margin-top:12px;
-      border:none;
-      border-radius:10px;
-      font-size:16px;
-      cursor:pointer;
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
     }
-    .btn-google {
-      background:#111;
-      color:#fff;
-    }
-    .btn-logout {
-      background:#eee;
-      color:#111;
-    }
-    .muted { color:#666; font-size:14px; }
-    .hidden { display:none; }
-    img.avatar {
-      width:80px;
-      height:80px;
-      border-radius:50%;
-      margin-bottom:10px;
-      object-fit:cover;
+    .btn-google { background: #111; color: #fff; }
+    .btn-logout { background: #eee; color: #111; }
+    .hidden { display: none; }
+    .muted { color: #666; font-size: 14px; }
+    .avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      margin: 10px 0;
+      object-fit: cover;
     }
     .err {
-      margin-top:8px;
-      font-size:13px;
-      color:#b00020;
-      word-break:break-word;
-      text-align:left;
+      margin-top: 8px;
+      font-size: 13px;
+      color: #b00020;
+      text-align: left;
+      word-break: break-word;
     }
   </style>
 </head>
 
 <body>
-  <!-- LOGIN CARD -->
-  <div id="loginCard" class="card">
-    <h2>Login / Register</h2>
-    <p class="muted">Continue with Google to create or access your account.</p>
-    <button id="googleBtn" class="btn-google">Continue with Google</button>
-    <div id="err" class="err"></div>
-  </div>
 
-  <!-- WELCOME (LOGGED-IN) CARD -->
-  <div id="welcomeCard" class="card hidden">
-    <h2>Welcome 🎉</h2>
-    <img id="photo" class="avatar" alt="User photo" />
-    <h3 id="name"></h3>
-    <p id="email" class="muted"></p>
-    <button id="logoutBtn" class="btn-logout">Logout</button>
-    <div id="err2" class="err"></div>
-  </div>
+<!-- LOGIN -->
+<div id="loginCard" class="card">
+  <h2>Login / Register</h2>
+  <p class="muted">Continue with Google</p>
+  <button id="googleBtn" class="btn-google">Continue with Google</button>
+  <div id="err" class="err"></div>
+</div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-    import {
-      getAuth,
-      GoogleAuthProvider,
-      signInWithPopup,
-      signInWithRedirect,
-      getRedirectResult,
-      onAuthStateChanged,
-      signOut,
-      setPersistence,
-      browserLocalPersistence,
-      browserSessionPersistence
-    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-    import {
-      getFirestore,
-      doc,
-      setDoc,
-      serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+<!-- WELCOME -->
+<div id="welcomeCard" class="card hidden">
+  <h2>Welcome 🎉</h2>
+  <img id="photo" class="avatar" />
+  <h3 id="name"></h3>
+  <p id="email" class="muted"></p>
+  <button id="logoutBtn" class="btn-logout">Logout</button>
+  <div id="err2" class="err"></div>
+</div>
 
-    // === tumhara project config ===
-    const firebaseConfig = {
-      apiKey: "AIzaSyDciz4ZaVuf11LA_MXb7a3YpmWbM6VyRC4",
-      authDomain: "oplotp.firebaseapp.com",
-      projectId: "oplotp",
-      storageBucket: "oplotp.firebasestorage.app",
-      messagingSenderId: "995278859788",
-      appId: "1:995278859788:web:f0baaa0c44abb6f68c0829",
-      measurementId: "G-YSSVM003KJ"
-    };
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import {
+    getAuth,
+    GoogleAuthProvider,
+    signInWithPopup,
+    onAuthStateChanged,
+    signOut,
+    setPersistence,
+    browserLocalPersistence
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+  import {
+    getFirestore,
+    doc,
+    setDoc,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-    const app  = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
+  // 🔥 YOUR FIREBASE CONFIG
+  const firebaseConfig = {
+    apiKey: "AIzaSyDciz4ZaVuf11LA_MXb7a3YpmWbM6VyRC4",
+    authDomain: "oplotp.firebaseapp.com",
+    projectId: "oplotp",
+    storageBucket: "oplotp.firebasestorage.app",
+    messagingSenderId: "995278859788",
+    appId: "1:995278859788:web:f0baaa0c44abb6f68c0829"
+  };
 
-    const loginCard   = document.getElementById("loginCard");
-    const welcomeCard = document.getElementById("welcomeCard");
-    const googleBtn   = document.getElementById("googleBtn");
-    const logoutBtn   = document.getElementById("logoutBtn");
-    const nameEl      = document.getElementById("name");
-    const emailEl     = document.getElementById("email");
-    const photoEl     = document.getElementById("photo");
-    const errEl       = document.getElementById("err");
-    const err2El      = document.getElementById("err2");
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
 
-    const showError = (where, e) => {
-      const msg = e?.code ? `${e.code}: ${e.message}` : String(e);
-      where.textContent = msg;
-      console.error(msg, e);
-    };
+  const loginCard   = document.getElementById("loginCard");
+  const welcomeCard = document.getElementById("welcomeCard");
+  const googleBtn   = document.getElementById("googleBtn");
+  const logoutBtn   = document.getElementById("logoutBtn");
+  const nameEl      = document.getElementById("name");
+  const emailEl     = document.getElementById("email");
+  const photoEl     = document.getElementById("photo");
+  const errEl       = document.getElementById("err");
+  const err2El      = document.getElementById("err2");
 
-    // device check
-    function isMobile() {
-      return /Android|iPhone|iPad|iPod|webOS|BlackBerry|Windows Phone/i.test(navigator.userAgent);
+  const saveUser = async (user) => {
+    await setDoc(
+      doc(db, "users", user.uid),
+      {
+        uid: user.uid,
+        name: user.displayName || "",
+        email: user.email || "",
+        photo: user.photoURL || "",
+        provider: "google",
+        lastLogin: serverTimestamp()
+      },
+      { merge: true }
+    );
+  };
+
+  googleBtn.onclick = async () => {
+    errEl.textContent = "";
+    const provider = new GoogleAuthProvider();
+
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+
+      const result = await signInWithPopup(auth, provider);
+
+      await saveUser(result.user);
+
+    } catch (e) {
+      errEl.textContent = e.message;
     }
+  };
 
-    // Function to save user data to Firestore
-    const saveUserToFirestore = async (user) => {
-      if (!user) return;
-      
-      try {
-        await setDoc(
-          doc(db, "users", user.uid),
-          {
-            uid: user.uid,
-            name: user.displayName || "",
-            email: user.email || "",
-            photo: user.photoURL || "",
-            lastLogin: serverTimestamp(),
-            provider: user.providerData[0]?.providerId || "google.com",
-            updatedAt: serverTimestamp()
-          },
-          { merge: true }
-        );
-        console.log("User data saved to Firestore:", user.uid);
-      } catch (e) {
-        console.error("Error saving to Firestore:", e);
-        showError(err2El, e);
-      }
-    };
+  logoutBtn.onclick = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      err2El.textContent = e.message;
+    }
+  };
 
-    // Handle redirect result (IMPORTANT for mobile)
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          console.log("Redirect login successful:", result.user.uid);
-          // Save user data to Firestore
-          await saveUserToFirestore(result.user);
-        }
-      } catch (e) {
-        console.error("Redirect result error:", e);
-        showError(errEl, e);
-      }
-    };
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      nameEl.textContent = user.displayName;
+      emailEl.textContent = user.email;
+      photoEl.src = user.photoURL || "";
+      loginCard.classList.add("hidden");
+      welcomeCard.classList.remove("hidden");
+    } else {
+      loginCard.classList.remove("hidden");
+      welcomeCard.classList.add("hidden");
+    }
+  });
+</script>
 
-    // Google login: desktop -> popup, mobile -> redirect
-    googleBtn.onclick = async () => {
-      errEl.textContent = "";
-      const provider = new GoogleAuthProvider();
-      provider.addScope('profile');
-      provider.addScope('email');
-
-      try {
-        if (isMobile()) {
-          // For mobile, use redirect
-          console.log("Mobile detected, using redirect...");
-          await setPersistence(auth, browserSessionPersistence);
-          await signInWithRedirect(auth, provider);
-        } else {
-          // For desktop, use popup
-          console.log("Desktop detected, using popup...");
-          await setPersistence(auth, browserLocalPersistence);
-          const result = await signInWithPopup(auth, provider);
-          // Save user data immediately for popup flow
-          await saveUserToFirestore(result.user);
-        }
-      } catch (e) {
-        console.error("Login error:", e);
-        showError(errEl, e);
-      }
-    };
-
-    // Logout
-    logoutBtn.onclick = async () => {
-      err2El.textContent = "";
-      try {
-        await signOut(auth);
-      } catch (e) {
-        showError(err2El, e);
-      }
-    };
-
-    // Main initialization
-    const initAuth = async () => {
-      try {
-        // Set persistence first
-        await setPersistence(auth, browserLocalPersistence);
-        
-        // Handle redirect result first
-        await handleRedirectResult();
-
-        // Auth state listener
-        onAuthStateChanged(auth, async (user) => {
-          console.log("Auth state changed:", user ? user.uid : "no user");
-          
-          if (user) {
-            // UI Update
-            nameEl.textContent = user.displayName || "No Name";
-            emailEl.textContent = user.email || "No Email";
-            photoEl.src = user.photoURL || "";
-            loginCard.classList.add("hidden");
-            welcomeCard.classList.remove("hidden");
-
-            // For mobile redirect flow, save user data when auth state changes
-            // This ensures data is saved even if redirect result handling missed it
-            await saveUserToFirestore(user);
-            
-          } else {
-            // No user logged in
-            loginCard.classList.remove("hidden");
-            welcomeCard.classList.add("hidden");
-            photoEl.src = "";
-            nameEl.textContent = "";
-            emailEl.textContent = "";
-          }
-        });
-      } catch (error) {
-        console.error("Initialization error:", error);
-        showError(errEl, error);
-      }
-    };
-
-    // Start the app
-    initAuth();
-  </script>
 </body>
 </html>
