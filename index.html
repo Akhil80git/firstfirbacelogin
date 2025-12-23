@@ -2,217 +2,157 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>oplotp - Auth + Firestore</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Google Login – Firebase</title>
+
   <style>
-    body { font-family: system-ui, Arial, sans-serif; margin: 16px; max-width: 720px; }
-    .card { border: 1px solid #ddd; border-radius: 14px; padding: 14px; margin-top: 12px; }
-    .row { display: grid; gap: 10px; }
-    input, button { padding: 12px; font-size: 16px; border-radius: 10px; border: 1px solid #ddd; }
-    button { cursor: pointer; border: 0; background: #111; color: #fff; }
-    button.secondary { background: #f3f3f3; color: #111; border: 1px solid #ddd; }
-    .muted { color: #666; }
-    .hidden { display:none; }
-    .small { font-size: 14px; }
+    body {
+      font-family: system-ui, Arial, sans-serif;
+      background: #f5f7fb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: #fff;
+      padding: 24px;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.1);
+      text-align: center;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+    }
+    .google {
+      background: #111;
+      color: #fff;
+    }
+    .logout {
+      background: #eee;
+      margin-top: 10px;
+    }
+    .hidden { display: none; }
+    img {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      margin-bottom: 10px;
+    }
+    .muted {
+      color: #666;
+      font-size: 14px;
+      margin-top: 10px;
+    }
   </style>
 </head>
-<body>
-  <h2>Firebase Login + Profile</h2>
 
-  <div id="signedOut" class="card">
-    <h3>Login / Register</h3>
-    <div class="row">
-      <input id="email" type="email" placeholder="Email" autocomplete="email" />
-      <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
-      <button id="btnRegister">Register (Email/Password)</button>
-      <button id="btnLogin" class="secondary">Login (Email/Password)</button>
-      <button id="btnGoogle">Continue with Google</button>
-      <p id="authMsg" class="muted small"></p>
-      <p class="muted small">Deploy ke baad Firebase Console → Auth → Settings → Authorized domains me aapka Vercel domain add karna.</p>
-    </div>
+<body>
+
+  <!-- LOGGED OUT -->
+  <div id="loggedOut" class="card">
+    <h2>Login / Register</h2>
+    <p class="muted">Continue with Google</p>
+    <button id="googleBtn" class="google">
+      Continue with Google
+    </button>
   </div>
 
-  <div id="signedIn" class="card hidden">
-    <h3>Profile</h3>
-    <p><b>UID:</b> <span id="uid"></span></p>
-    <p><b>Email:</b> <span id="userEmail"></span></p>
-    <p><b>Name:</b> <span id="userName"></span></p>
-
-    <hr />
-
-    <h4>Edit profile (Firestore)</h4>
-    <div class="row">
-      <input id="displayName" placeholder="Display name" />
-      <input id="phone" placeholder="Phone" inputmode="tel" />
-      <button id="btnSaveProfile">Save Profile</button>
-      <button id="btnLogout" class="secondary">Logout</button>
-      <p id="profileMsg" class="muted small"></p>
-    </div>
+  <!-- LOGGED IN -->
+  <div id="loggedIn" class="card hidden">
+    <img id="photo" />
+    <h3 id="name"></h3>
+    <p id="email" class="muted"></p>
+    <button id="logoutBtn" class="logout">Logout</button>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import {
       getAuth,
-      onAuthStateChanged,
-      createUserWithEmailAndPassword,
-      signInWithEmailAndPassword,
+      GoogleAuthProvider,
       signInWithRedirect,
       getRedirectResult,
-      GoogleAuthProvider,
-      signOut,
-      updateProfile
+      onAuthStateChanged,
+      signOut
     } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
     import {
       getFirestore,
       doc,
-      getDoc,
       setDoc,
       serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-    // ✅ Your config added
+    // 🔥 Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyDciz4ZaVuf11LA_MXb7a3YpmWbM6VyRC4",
       authDomain: "oplotp.firebaseapp.com",
       projectId: "oplotp",
       storageBucket: "oplotp.firebasestorage.app",
       messagingSenderId: "995278859788",
-      appId: "1:995278859788:web:f0baaa0c44abb6f68c0829",
-      measurementId: "G-YSSVM003KJ"
+      appId: "1:995278859788:web:f0baaa0c44abb6f68c0829"
     };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    const $ = (id) => document.getElementById(id);
+    const loggedOut = document.getElementById("loggedOut");
+    const loggedIn = document.getElementById("loggedIn");
 
-    const signedOut = $("signedOut");
-    const signedIn = $("signedIn");
-    const authMsg = $("authMsg");
-    const profileMsg = $("profileMsg");
+    const googleBtn = document.getElementById("googleBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
 
-    function showError(el, e) {
-      el.textContent = e?.message ? e.message : String(e);
-    }
+    const nameEl = document.getElementById("name");
+    const emailEl = document.getElementById("email");
+    const photoEl = document.getElementById("photo");
 
-    async function ensureUserDoc(user) {
-      const ref = doc(db, "users", user.uid);
-      const snap = await getDoc(ref);
+    // Google login (register + login same)
+    googleBtn.onclick = async () => {
+      const provider = new GoogleAuthProvider();
+      await signInWithRedirect(auth, provider);
+    };
 
-      const base = {
-        uid: user.uid,
-        email: user.email ?? null,
-        photoURL: user.photoURL ?? null,
-        updatedAt: serverTimestamp(),
-      };
+    // Handle redirect result
+    await getRedirectResult(auth);
 
-      if (!snap.exists()) {
-        await setDoc(ref, {
-          ...base,
-          createdAt: serverTimestamp(),
-          displayName: user.displayName ?? null,
-          phone: null
-        });
-      } else {
-        await setDoc(ref, base, { merge: true });
-      }
-    }
-
-    async function loadProfile(user) {
-      await ensureUserDoc(user);
-      const ref = doc(db, "users", user.uid);
-      const snap = await getDoc(ref);
-      const data = snap.data() || {};
-
-      $("displayName").value = data.displayName || user.displayName || "";
-      $("phone").value = data.phone || "";
-    }
-
-    $("btnRegister").addEventListener("click", async () => {
-      authMsg.textContent = "";
-      try {
-        const email = $("email").value.trim();
-        const password = $("password").value;
-        await createUserWithEmailAndPassword(auth, email, password);
-      } catch (e) {
-        showError(authMsg, e);
-      }
-    });
-
-    $("btnLogin").addEventListener("click", async () => {
-      authMsg.textContent = "";
-      try {
-        const email = $("email").value.trim();
-        const password = $("password").value;
-        await signInWithEmailAndPassword(auth, email, password);
-      } catch (e) {
-        showError(authMsg, e);
-      }
-    });
-
-    $("btnGoogle").addEventListener("click", async () => {
-      authMsg.textContent = "";
-      try {
-        const provider = new GoogleAuthProvider();
-        await signInWithRedirect(auth, provider); // official redirect flow [web:1]
-      } catch (e) {
-        showError(authMsg, e);
-      }
-    });
-
-    // Handle redirect result on page load [web:1]
-    getRedirectResult(auth).catch((e) => {
-      if (e?.code) showError(authMsg, e);
-    });
-
-    $("btnSaveProfile").addEventListener("click", async () => {
-      profileMsg.textContent = "";
-      const user = auth.currentUser;
-      if (!user) return;
-
-      try {
-        const newName = $("displayName").value.trim();
-        const phone = $("phone").value.trim();
-
-        if (newName && newName !== user.displayName) {
-          await updateProfile(user, { displayName: newName });
-        }
-
-        await setDoc(doc(db, "users", user.uid), {
-          displayName: newName || null,
-          phone: phone || null,
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
-
-        profileMsg.textContent = "Saved.";
-        $("userName").textContent = auth.currentUser.displayName || "-";
-      } catch (e) {
-        showError(profileMsg, e);
-      }
-    });
-
-    $("btnLogout").addEventListener("click", async () => {
-      await signOut(auth);
-    });
-
+    // Auth state
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        signedIn.classList.add("hidden");
-        signedOut.classList.remove("hidden");
+        loggedOut.classList.remove("hidden");
+        loggedIn.classList.add("hidden");
         return;
       }
 
-      signedOut.classList.add("hidden");
-      signedIn.classList.remove("hidden");
+      // Save user to Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        name: user.displayName,
+        email: user.email,
+        photo: user.photoURL,
+        lastLogin: serverTimestamp()
+      }, { merge: true });
 
-      $("uid").textContent = user.uid;
-      $("userEmail").textContent = user.email || "-";
-      $("userName").textContent = user.displayName || "-";
+      // UI
+      nameEl.textContent = user.displayName;
+      emailEl.textContent = user.email;
+      photoEl.src = user.photoURL;
 
-      await loadProfile(user);
+      loggedOut.classList.add("hidden");
+      loggedIn.classList.remove("hidden");
     });
+
+    logoutBtn.onclick = async () => {
+      await signOut(auth);
+    };
   </script>
+
 </body>
 </html>
