@@ -1,209 +1,218 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Secure Google Login</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- CLEAN MODERN STYLE -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>oplotp - Auth + Firestore</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #1e3a8a, #6d28d9);
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      color: white;
-    }
-
-    .card {
-      background: #111827;
-      width: 340px;
-      padding: 28px;
-      border-radius: 16px;
-      text-align: center;
-      box-shadow: 0 20px 40px rgba(0,0,0,.4);
-    }
-
-    h2 {
-      margin-bottom: 20px;
-    }
-
-    button {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      border-radius: 8px;
-      background: linear-gradient(135deg,#2563eb,#7c3aed);
-      color: white;
-      font-size: 15px;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    #userBox {
-      display: none;
-      margin-top: 20px;
-    }
-
-    img {
-      width: 90px;
-      height: 90px;
-      border-radius: 50%;
-      object-fit: cover;
-      margin-bottom: 10px;
-      border: 3px solid #6366f1;
-    }
-
-    .email {
-      font-size: 13px;
-      color: #c7d2fe;
-      margin-top: 4px;
-    }
-
-    #status {
-      margin-top: 12px;
-      font-size: 12px;
-      color: #9ca3af;
-    }
+    body { font-family: system-ui, Arial, sans-serif; margin: 16px; max-width: 720px; }
+    .card { border: 1px solid #ddd; border-radius: 14px; padding: 14px; margin-top: 12px; }
+    .row { display: grid; gap: 10px; }
+    input, button { padding: 12px; font-size: 16px; border-radius: 10px; border: 1px solid #ddd; }
+    button { cursor: pointer; border: 0; background: #111; color: #fff; }
+    button.secondary { background: #f3f3f3; color: #111; border: 1px solid #ddd; }
+    .muted { color: #666; }
+    .hidden { display:none; }
+    .small { font-size: 14px; }
   </style>
 </head>
-
 <body>
-  <div class="card">
-    <h2>Welcome</h2>
+  <h2>Firebase Login + Profile</h2>
 
-    <button id="loginBtn">Continue with Google</button>
-
-    <div id="userBox">
-      <img id="photo" />
-      <h3 id="name"></h3>
-      <p class="email" id="email"></p>
-      <button id="logoutBtn" style="margin-top:14px;background:#ef4444;">Logout</button>
+  <div id="signedOut" class="card">
+    <h3>Login / Register</h3>
+    <div class="row">
+      <input id="email" type="email" placeholder="Email" autocomplete="email" />
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+      <button id="btnRegister">Register (Email/Password)</button>
+      <button id="btnLogin" class="secondary">Login (Email/Password)</button>
+      <button id="btnGoogle">Continue with Google</button>
+      <p id="authMsg" class="muted small"></p>
+      <p class="muted small">Deploy ke baad Firebase Console → Auth → Settings → Authorized domains me aapka Vercel domain add karna.</p>
     </div>
-
-    <p id="status"></p>
   </div>
 
-  <!-- FIREBASE -->
+  <div id="signedIn" class="card hidden">
+    <h3>Profile</h3>
+    <p><b>UID:</b> <span id="uid"></span></p>
+    <p><b>Email:</b> <span id="userEmail"></span></p>
+    <p><b>Name:</b> <span id="userName"></span></p>
+
+    <hr />
+
+    <h4>Edit profile (Firestore)</h4>
+    <div class="row">
+      <input id="displayName" placeholder="Display name" />
+      <input id="phone" placeholder="Phone" inputmode="tel" />
+      <button id="btnSaveProfile">Save Profile</button>
+      <button id="btnLogout" class="secondary">Logout</button>
+      <p id="profileMsg" class="muted small"></p>
+    </div>
+  </div>
+
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import {
       getAuth,
-      GoogleAuthProvider,
+      onAuthStateChanged,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
       signInWithRedirect,
       getRedirectResult,
-      onAuthStateChanged,
-      signOut
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+      GoogleAuthProvider,
+      signOut,
+      updateProfile
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
     import {
       getFirestore,
       doc,
       getDoc,
       setDoc,
       serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-    // 🔥 YOUR FIREBASE CONFIG
+    // ✅ Your config added
     const firebaseConfig = {
       apiKey: "AIzaSyDciz4ZaVuf11LA_MXb7a3YpmWbM6VyRC4",
       authDomain: "oplotp.firebaseapp.com",
       projectId: "oplotp",
       storageBucket: "oplotp.firebasestorage.app",
       messagingSenderId: "995278859788",
-      appId: "1:995278859788:web:f0baaa0c44abb6f68c0829"
+      appId: "1:995278859788:web:f0baaa0c44abb6f68c0829",
+      measurementId: "G-YSSVM003KJ"
     };
 
-    // INIT
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const provider = new GoogleAuthProvider();
 
-    // UI
-    const loginBtn = document.getElementById("loginBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const userBox = document.getElementById("userBox");
-    const nameEl = document.getElementById("name");
-    const emailEl = document.getElementById("email");
-    const photoEl = document.getElementById("photo");
-    const statusEl = document.getElementById("status");
+    const $ = (id) => document.getElementById(id);
 
-    const setStatus = (msg) => statusEl.textContent = msg || "";
+    const signedOut = $("signedOut");
+    const signedIn = $("signedIn");
+    const authMsg = $("authMsg");
+    const profileMsg = $("profileMsg");
 
-    // LOGIN
-    loginBtn.onclick = () => {
-      loginBtn.disabled = true;
-      setStatus("Redirecting to Google...");
-      signInWithRedirect(auth, provider);
-    };
+    function showError(el, e) {
+      el.textContent = e?.message ? e.message : String(e);
+    }
 
-    // AFTER REDIRECT (MOBILE SAFE)
-    getRedirectResult(auth).then(async (result) => {
-      if (result?.user) {
-        await saveUser(result.user);
-      }
-    }).catch(err => {
-      setStatus(err.message);
-    });
-
-    // AUTO LOGIN
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        await saveUser(user);
-        showUser(user);
-      } else {
-        showLogout();
-      }
-    });
-
-    // SAVE TO FIRESTORE
-    async function saveUser(user) {
+    async function ensureUserDoc(user) {
       const ref = doc(db, "users", user.uid);
       const snap = await getDoc(ref);
 
+      const base = {
+        uid: user.uid,
+        email: user.email ?? null,
+        photoURL: user.photoURL ?? null,
+        updatedAt: serverTimestamp(),
+      };
+
       if (!snap.exists()) {
         await setDoc(ref, {
-          uid: user.uid,
-          name: user.displayName,
-          email: user.email,
-          photo: user.photoURL,
-          provider: "google",
-          createdAt: serverTimestamp()
+          ...base,
+          createdAt: serverTimestamp(),
+          displayName: user.displayName ?? null,
+          phone: null
         });
+      } else {
+        await setDoc(ref, base, { merge: true });
       }
     }
 
-    // UI HELPERS
-    function showUser(user) {
-      loginBtn.style.display = "none";
-      userBox.style.display = "block";
-      nameEl.textContent = user.displayName;
-      emailEl.textContent = user.email;
-      photoEl.src = user.photoURL;
-      setStatus("Logged in successfully");
+    async function loadProfile(user) {
+      await ensureUserDoc(user);
+      const ref = doc(db, "users", user.uid);
+      const snap = await getDoc(ref);
+      const data = snap.data() || {};
+
+      $("displayName").value = data.displayName || user.displayName || "";
+      $("phone").value = data.phone || "";
     }
 
-    function showLogout() {
-      loginBtn.style.display = "block";
-      loginBtn.disabled = false;
-      userBox.style.display = "none";
-      setStatus("");
-    }
+    $("btnRegister").addEventListener("click", async () => {
+      authMsg.textContent = "";
+      try {
+        const email = $("email").value.trim();
+        const password = $("password").value;
+        await createUserWithEmailAndPassword(auth, email, password);
+      } catch (e) {
+        showError(authMsg, e);
+      }
+    });
 
-    // LOGOUT
-    logoutBtn.onclick = async () => {
+    $("btnLogin").addEventListener("click", async () => {
+      authMsg.textContent = "";
+      try {
+        const email = $("email").value.trim();
+        const password = $("password").value;
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (e) {
+        showError(authMsg, e);
+      }
+    });
+
+    $("btnGoogle").addEventListener("click", async () => {
+      authMsg.textContent = "";
+      try {
+        const provider = new GoogleAuthProvider();
+        await signInWithRedirect(auth, provider); // official redirect flow [web:1]
+      } catch (e) {
+        showError(authMsg, e);
+      }
+    });
+
+    // Handle redirect result on page load [web:1]
+    getRedirectResult(auth).catch((e) => {
+      if (e?.code) showError(authMsg, e);
+    });
+
+    $("btnSaveProfile").addEventListener("click", async () => {
+      profileMsg.textContent = "";
+      const user = auth.currentUser;
+      if (!user) return;
+
+      try {
+        const newName = $("displayName").value.trim();
+        const phone = $("phone").value.trim();
+
+        if (newName && newName !== user.displayName) {
+          await updateProfile(user, { displayName: newName });
+        }
+
+        await setDoc(doc(db, "users", user.uid), {
+          displayName: newName || null,
+          phone: phone || null,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+
+        profileMsg.textContent = "Saved.";
+        $("userName").textContent = auth.currentUser.displayName || "-";
+      } catch (e) {
+        showError(profileMsg, e);
+      }
+    });
+
+    $("btnLogout").addEventListener("click", async () => {
       await signOut(auth);
-      setStatus("Logged out");
-    };
+    });
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        signedIn.classList.add("hidden");
+        signedOut.classList.remove("hidden");
+        return;
+      }
+
+      signedOut.classList.add("hidden");
+      signedIn.classList.remove("hidden");
+
+      $("uid").textContent = user.uid;
+      $("userEmail").textContent = user.email || "-";
+      $("userName").textContent = user.displayName || "-";
+
+      await loadProfile(user);
+    });
   </script>
 </body>
 </html>
