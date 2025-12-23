@@ -26,6 +26,7 @@
       color:#e5e7eb;
     }
     h2 { margin:0 0 10px; font-size:24px; }
+    h3 { margin:8px 0 4px; }
     p { margin:0 0 6px; }
     button {
       width:100%;
@@ -85,6 +86,7 @@
     <div id="err2" class="err"></div>
   </div>
 
+  <!-- JS MUST BE LAST, AND type="module" -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import {
@@ -104,7 +106,7 @@
       serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-    // === Tumhara Firebase config ===
+    // ==== TUMHARA FIREBASE CONFIG ====
     const firebaseConfig = {
       apiKey: "AIzaSyDciz4ZaVuf11LA_MXb7a3YpmWbM6VyRC4",
       authDomain: "oplotp.firebaseapp.com",
@@ -115,6 +117,7 @@
       measurementId: "G-YSSVM003KJ"
     };
 
+    // ==== INIT ====
     const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db   = getFirestore(app);
@@ -135,33 +138,33 @@
       console.error(msg, e);
     };
 
-    // Login session ko localStorage me persist karo
+    // Persist session in localStorage
     await setPersistence(auth, browserLocalPersistence);
 
-    // -------- LOGIN (REDIRECT) --------
+    // ---- LOGIN BUTTON (REDIRECT) ----
     googleBtn.onclick = async () => {
+      console.log("Google button clicked");
       errEl.textContent = "";
       const provider = new GoogleAuthProvider();
       try {
-        await signInWithRedirect(auth, provider);   // mobile-friendly
+        await signInWithRedirect(auth, provider);
       } catch (e) {
         showError(errEl, e);
       }
     };
 
-    // -------- REDIRECT RESULT (page load ke baad) --------
+    // ---- HANDLE REDIRECT RESULT ON LOAD ----
     try {
       const result = await getRedirectResult(auth);
       if (result && result.user) {
-        console.log("Redirect login user:", result.user);
-        // Auth state listener niche UI + Firestore handle karega
+        console.log("Redirect result user:", result.user);
+        // onAuthStateChanged niche UI + Firestore karega
       }
     } catch (e) {
-      // Yahan ka error mostly config / domain issue hota hai
       showError(errEl, e);
     }
 
-    // -------- LOGOUT --------
+    // ---- LOGOUT BUTTON ----
     logoutBtn.onclick = async () => {
       err2El.textContent = "";
       try {
@@ -171,17 +174,18 @@
       }
     };
 
-    // -------- AUTH STATE + FIRESTORE SAVE --------
+    // ---- AUTH STATE + FIRESTORE SAVE ----
     onAuthStateChanged(auth, async (user) => {
+      console.log("Auth state changed:", user?.uid || "no user");
       if (user) {
-        // UI: welcome page
+        // UI
         nameEl.textContent  = user.displayName || "";
         emailEl.textContent = user.email || "";
         photoEl.src         = user.photoURL || "";
         loginCard.classList.add("hidden");
         welcomeCard.classList.remove("hidden");
 
-        // Firestore: users/{uid}
+        // Firestore
         try {
           await setDoc(
             doc(db, "users", user.uid),
