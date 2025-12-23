@@ -9,45 +9,41 @@
     body {
       margin:0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:#0f172a;
+      background:#f5f7fb;
       min-height:100vh;
       display:flex;
       align-items:center;
       justify-content:center;
     }
     .card {
-      background:#020617;
+      background:#fff;
       padding:24px;
-      border-radius:20px;
-      box-shadow:0 20px 40px rgba(15,23,42,.6);
+      border-radius:16px;
+      box-shadow:0 10px 30px rgba(0,0,0,.08);
       width:100%;
       max-width:380px;
       text-align:center;
-      color:#e5e7eb;
     }
-    h2 { margin:0 0 10px; font-size:24px; }
-    h3 { margin:8px 0 4px; }
+    h1,h2,h3 { margin:0 0 10px; }
     p { margin:0 0 6px; }
     button {
       width:100%;
       padding:14px;
-      margin-top:14px;
+      margin-top:12px;
       border:none;
-      border-radius:999px;
+      border-radius:10px;
       font-size:16px;
       cursor:pointer;
-      font-weight:500;
     }
     .btn-google {
-      background:#111827;
-      color:#f9fafb;
+      background:#111;
+      color:#fff;
     }
     .btn-logout {
-      background:#020617;
-      color:#e5e7eb;
-      border:1px solid #1f2937;
+      background:#eee;
+      color:#111;
     }
-    .muted { color:#9ca3af; font-size:14px; }
+    .muted { color:#666; font-size:14px; }
     .hidden { display:none; }
     img.avatar {
       width:80px;
@@ -55,12 +51,11 @@
       border-radius:50%;
       margin-bottom:10px;
       object-fit:cover;
-      border:3px solid #4f46e5;
     }
     .err {
       margin-top:8px;
       font-size:13px;
-      color:#f97373;
+      color:#b00020;
       word-break:break-word;
       text-align:left;
     }
@@ -71,7 +66,7 @@
   <!-- LOGIN CARD -->
   <div id="loginCard" class="card">
     <h2>Login / Register</h2>
-    <p class="muted">Sign in with Google to create or access your account.</p>
+    <p class="muted">Continue with Google to create or access your account.</p>
     <button id="googleBtn" class="btn-google">Continue with Google</button>
     <div id="err" class="err"></div>
   </div>
@@ -86,12 +81,12 @@
     <div id="err2" class="err"></div>
   </div>
 
-  <!-- JS MUST BE LAST, AND type="module" -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import {
       getAuth,
       GoogleAuthProvider,
+      signInWithPopup,
       signInWithRedirect,
       getRedirectResult,
       onAuthStateChanged,
@@ -106,7 +101,7 @@
       serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-    // ==== TUMHARA FIREBASE CONFIG ====
+    // === tumhara project config ===
     const firebaseConfig = {
       apiKey: "AIzaSyDciz4ZaVuf11LA_MXb7a3YpmWbM6VyRC4",
       authDomain: "oplotp.firebaseapp.com",
@@ -117,7 +112,6 @@
       measurementId: "G-YSSVM003KJ"
     };
 
-    // ==== INIT ====
     const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db   = getFirestore(app);
@@ -138,33 +132,41 @@
       console.error(msg, e);
     };
 
-    // Persist session in localStorage
+    // device check
+    function isMobile() {
+      return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    }
+
+    // session persist
     await setPersistence(auth, browserLocalPersistence);
 
-    // ---- LOGIN BUTTON (REDIRECT) ----
-    googleBtn.onclick = async () => {
-      console.log("Google button clicked");
-      errEl.textContent = "";
-      const provider = new GoogleAuthProvider();
-      try {
-        await signInWithRedirect(auth, provider);
-      } catch (e) {
-        showError(errEl, e);
-      }
-    };
-
-    // ---- HANDLE REDIRECT RESULT ON LOAD ----
+    // handle redirect result (mobile)
     try {
       const result = await getRedirectResult(auth);
       if (result && result.user) {
-        console.log("Redirect result user:", result.user);
-        // onAuthStateChanged niche UI + Firestore karega
+        console.log("Redirect login user:", result.user);
       }
     } catch (e) {
       showError(errEl, e);
     }
 
-    // ---- LOGOUT BUTTON ----
+    // Google login: desktop -> popup, mobile -> redirect
+    googleBtn.onclick = async () => {
+      errEl.textContent = "";
+      const provider = new GoogleAuthProvider();
+
+      try {
+        if (isMobile()) {
+          await signInWithRedirect(auth, provider);   // mobile
+        } else {
+          await signInWithPopup(auth, provider);      // desktop
+        }
+      } catch (e) {
+        showError(errEl, e);
+      }
+    };
+
+    // Logout
     logoutBtn.onclick = async () => {
       err2El.textContent = "";
       try {
@@ -174,9 +176,9 @@
       }
     };
 
-    // ---- AUTH STATE + FIRESTORE SAVE ----
+    // Auth state listener + Firestore
     onAuthStateChanged(auth, async (user) => {
-      console.log("Auth state changed:", user?.uid || "no user");
+      console.log("Auth state changed:", user ? user.uid : "no user");
       if (user) {
         // UI
         nameEl.textContent  = user.displayName || "";
@@ -185,7 +187,7 @@
         loginCard.classList.add("hidden");
         welcomeCard.classList.remove("hidden");
 
-        // Firestore
+        // Firestore: users/{uid}
         try {
           await setDoc(
             doc(db, "users", user.uid),
