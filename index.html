@@ -92,7 +92,8 @@
       onAuthStateChanged,
       signOut,
       setPersistence,
-      browserLocalPersistence
+      browserLocalPersistence,
+      browserSessionPersistence
     } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
     import {
       getFirestore,
@@ -134,34 +135,72 @@
 
     // device check
     function isMobile() {
-      return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      return /Android|iPhone|iPad|iPod|webOS|BlackBerry|Windows Phone/i.test(navigator.userAgent);
     }
 
-    // session persist
-    await setPersistence(auth, browserLocalPersistence);
-
-    // handle redirect result (mobile)
-    try {
-      const result = await getRedirectResult(auth);
-      if (result && result.user) {
-        console.log("Redirect login user:", result.user);
+    // Function to save user data to Firestore
+    const saveUserToFirestore = async (user) => {
+      if (!user) return;
+      
+      try {
+        await setDoc(
+          doc(db, "users", user.uid),
+          {
+            uid: user.uid,
+            name: user.displayName || "",
+            email: user.email || "",
+            photo: user.photoURL || "",
+            lastLogin: serverTimestamp(),
+            provider: user.providerData[0]?.providerId || "google.com",
+            updatedAt: serverTimestamp()
+          },
+          { merge: true }
+        );
+        console.log("User data saved to Firestore:", user.uid);
+      } catch (e) {
+        console.error("Error saving to Firestore:", e);
+        showError(err2El, e);
       }
-    } catch (e) {
-      showError(errEl, e);
-    }
+    };
+
+    // Handle redirect result (IMPORTANT for mobile)
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          console.log("Redirect login successful:", result.user.uid);
+          // Save user data to Firestore
+          await saveUserToFirestore(result.user);
+        }
+      } catch (e) {
+        console.error("Redirect result error:", e);
+        showError(errEl, e);
+      }
+    };
 
     // Google login: desktop -> popup, mobile -> redirect
     googleBtn.onclick = async () => {
       errEl.textContent = "";
       const provider = new GoogleAuthProvider();
+      provider.addScope('profile');
+      provider.addScope('email');
 
       try {
         if (isMobile()) {
-          await signInWithRedirect(auth, provider);   // mobile
+          // For mobile, use redirect
+          console.log("Mobile detected, using redirect...");
+          await setPersistence(auth, browserSessionPersistence);
+          await signInWithRedirect(auth, provider);
         } else {
-          await signInWithPopup(auth, provider);      // desktop
+          // For desktop, use popup
+          console.log("Desktop detected, using popup...");
+          await setPersistence(auth, browserLocalPersistence);
+          const result = await signInWithPopup(auth, provider);
+          // Save user data immediately for popup flow
+          await saveUserToFirestore(result.user);
         }
       } catch (e) {
+        console.error("Login error:", e);
         showError(errEl, e);
       }
     };
@@ -176,38 +215,48 @@
       }
     };
 
-    // Auth state listener + Firestore
-    onAuthStateChanged(auth, async (user) => {
-      console.log("Auth state changed:", user ? user.uid : "no user");
-      if (user) {
-        // UI
-        nameEl.textContent  = user.displayName || "";
-        emailEl.textContent = user.email || "";
-        photoEl.src         = user.photoURL || "";
-        loginCard.classList.add("hidden");
-        welcomeCard.classList.remove("hidden");
+    // Main initialization
+    const initAuth = async () => {
+      try {
+        // Set persistence first
+        await setPersistence(auth, browserLocalPersistence);
+        
+        // Handle redirect result first
+        await handleRedirectResult();
 
-        // Firestore: users/{uid}
-        try {
-          await setDoc(
-            doc(db, "users", user.uid),
-            {
-              uid: user.uid,
-              name: user.displayName || "",
-              email: user.email || "",
-              photo: user.photoURL || "",
-              lastLogin: serverTimestamp()
-            },
-            { merge: true }
-          );
-        } catch (e) {
-          showError(err2El, e);
-        }
-      } else {
-        loginCard.classList.remove("hidden");
-        welcomeCard.classList.add("hidden");
+        // Auth state listener
+        onAuthStateChanged(auth, async (user) => {
+          console.log("Auth state changed:", user ? user.uid : "no user");
+          
+          if (user) {
+            // UI Update
+            nameEl.textContent = user.displayName || "No Name";
+            emailEl.textContent = user.email || "No Email";
+            photoEl.src = user.photoURL || "";
+            loginCard.classList.add("hidden");
+            welcomeCard.classList.remove("hidden");
+
+            // For mobile redirect flow, save user data when auth state changes
+            // This ensures data is saved even if redirect result handling missed it
+            await saveUserToFirestore(user);
+            
+          } else {
+            // No user logged in
+            loginCard.classList.remove("hidden");
+            welcomeCard.classList.add("hidden");
+            photoEl.src = "";
+            nameEl.textContent = "";
+            emailEl.textContent = "";
+          }
+        });
+      } catch (error) {
+        console.error("Initialization error:", error);
+        showError(errEl, error);
       }
-    });
+    };
+
+    // Start the app
+    initAuth();
   </script>
 </body>
 </html>
