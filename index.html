@@ -82,7 +82,6 @@
   </div>
 
   <script type="module">
-    /* ---------- Firebase imports ---------- */
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import {
       getAuth,
@@ -93,8 +92,14 @@
       setPersistence,
       browserLocalPersistence
     } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-    /* ---------- Your project config (same as console) ---------- */
+    // === tumhara project config ===
     const firebaseConfig = {
       apiKey: "AIzaSyDciz4ZaVuf11LA_MXb7a3YpmWbM6VyRC4",
       authDomain: "oplotp.firebaseapp.com",
@@ -105,9 +110,9 @@
       measurementId: "G-YSSVM003KJ"
     };
 
-    /* ---------- Init Firebase ---------- */
-    const app = initializeApp(firebaseConfig);
+    const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    const db   = getFirestore(app);
 
     const loginCard   = document.getElementById("loginCard");
     const welcomeCard = document.getElementById("welcomeCard");
@@ -125,22 +130,22 @@
       console.error(msg, e);
     };
 
-    // Persist login in local storage so refresh ke baad bhi login rahe.
+    // login session localStorage me rakho
     await setPersistence(auth, browserLocalPersistence);
 
-    /* ---------- Login button (Google Popup) ---------- */
+    // Google login (popup)
     googleBtn.onclick = async () => {
       errEl.textContent = "";
       const provider = new GoogleAuthProvider();
       try {
         await signInWithPopup(auth, provider);
-        // onAuthStateChanged callback automatically UI update karega.
+        // onAuthStateChanged UI + Firestore handle karega
       } catch (e) {
         showError(errEl, e);
       }
     };
 
-    /* ---------- Logout button ---------- */
+    // Logout
     logoutBtn.onclick = async () => {
       err2El.textContent = "";
       try {
@@ -150,17 +155,33 @@
       }
     };
 
-    /* ---------- Auth state listener (UI switch) ---------- */
-    onAuthStateChanged(auth, (user) => {
+    // Auth state listener
+    onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Logged IN – Welcome page
+        // UI: welcome page
         nameEl.textContent  = user.displayName || "";
         emailEl.textContent = user.email || "";
         photoEl.src         = user.photoURL || "";
         loginCard.classList.add("hidden");
         welcomeCard.classList.remove("hidden");
+
+        // Firestore: users/{uid}
+        try {
+          await setDoc(
+            doc(db, "users", user.uid),
+            {
+              uid: user.uid,
+              name: user.displayName || "",
+              email: user.email || "",
+              photo: user.photoURL || "",
+              lastLogin: serverTimestamp()
+            },
+            { merge: true }
+          );
+        } catch (e) {
+          showError(err2El, e);
+        }
       } else {
-        // Logged OUT – Login page
         loginCard.classList.remove("hidden");
         welcomeCard.classList.add("hidden");
       }
